@@ -9,7 +9,6 @@ import type { Request as ExpressRequest, Response as ExpressResponse } from "exp
 
 
 const app = express();
-app.use(express.json());
 
 // A map of String, StreamableHTTPServerTransport objects to store each client connection
 const transports: Record<string, StreamableHTTPServerTransport> = {};
