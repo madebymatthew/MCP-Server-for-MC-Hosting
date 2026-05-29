@@ -1,4 +1,9 @@
 node_modules
 .git
 .gitattributes
+.gitignore
 *.log
+.env
+.env_example
+Dockerfile
+.dockerignore

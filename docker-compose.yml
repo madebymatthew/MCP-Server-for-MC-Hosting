@@ -1,0 +1,14 @@
+services:
+  mcp-server:
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    ports:
+      - "${PORT}:${PORT}"
+    environment:
+      - NODE_ENV=production
+      - PORT=${PORT:?PORT is not set in .env}
+    image: ghcr.io/madebymatthew/mcp-server-for-mc-hosting:latest
+    restart: unless-stopped
