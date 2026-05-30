@@ -9,6 +9,7 @@ import type { Request as ExpressRequest, Response as ExpressResponse } from "exp
 
 
 const app = express();
+app.use(express.json());
 
 // A map of String, StreamableHTTPServerTransport objects to store each client connection
 const transports: Record<string, StreamableHTTPServerTransport> = {};
@@ -25,6 +26,7 @@ app.post("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
     if (sessionId && transports[sessionId]) {
         // If its an existing session, then use the transport we already have
         transport = transports[sessionId];
+        await transport.handleRequest(req, res, req.body);
     }
     // Else if its a new initialize session
     else if (!sessionId && isInitializeRequest(req.body)) {
@@ -48,9 +50,13 @@ app.post("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
             sessionIdGenerator: () => crypto.randomUUID()
         });
 
-        // Add the transport to the map of transports and link it to the server
-        transports[transport.sessionId!] = transport;
+        // Link to the server and handle request
         await server.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+
+        // ONLY AFTER CONNECTING AND HANDLING REQUEST DO WE STORE TRANSPORT
+        // Otherwise sessionId will be undefined
+        transports[transport.sessionId!] = transport;
     }
     // Else theres been a problem with this request
     else {
@@ -59,7 +65,7 @@ app.post("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
     }
 
     // Transport is now initialized, it'll forward requests to the mcp server
-    await transport.handleRequest(req, res);
+    
 });
 
 // Now set up graceful connection termination
@@ -74,7 +80,7 @@ app.delete("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
     }
 
     // Remove the transport from the map
-    await transports[sessionId].handleRequest(req, res);
+    await transports[sessionId].handleRequest(req, res, req.body);
     delete transports[sessionId];
 });
 
