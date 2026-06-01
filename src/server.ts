@@ -34,6 +34,9 @@ app.post("/mcp", requireAuth, async (req: ExpressRequest, res: ExpressResponse) 
     const sessionId = req.headers["mcp-session-id"] as string | undefined; 
     let transport: StreamableHTTPServerTransport;
 
+    console.log("Received request at /mcp endpoint with sessionId: ", sessionId);
+    console.log("Current transports map: ", Object.keys(transports));
+
     // Check if its an existing session or a new session
     if (sessionId && transports[sessionId]) {
         // If its an existing session, then use the transport we already have
@@ -45,10 +48,14 @@ app.post("/mcp", requireAuth, async (req: ExpressRequest, res: ExpressResponse) 
 
         // Create new mcp server object to handle session state
         const server = new McpServer({ name: "Minecraft Server Hosting", version: "1.0.0"});
+
+        console.log("Initializing new MCP session with new McpServer instance, now adding capabilities...");
         
         // Add the capabilities this server should handle (depends on admin or regular user)
         const isAdmin: boolean = checkAdminPermissions(req);
         registerCapabilities(server, isAdmin);
+
+        console.log("Finished registering capabilities, user is admin: ", isAdmin);
 
         // Create new transport for this connection
         transport = new StreamableHTTPServerTransport({
@@ -81,6 +88,8 @@ app.delete("/mcp", requireAuth, async (req: ExpressRequest, res: ExpressResponse
     
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     
+    console.log("Received request to terminate MCP session with sessionId: ", sessionId);
+
     // check if the session ID was provided and exists in transports
     if (!sessionId || !transports[sessionId]) {
         res.status(400).json({ error: "Invalid session ID" });
@@ -90,6 +99,8 @@ app.delete("/mcp", requireAuth, async (req: ExpressRequest, res: ExpressResponse
     // Remove the transport from the map
     await transports[sessionId].handleRequest(req as unknown as IncomingMessage, res, req.body);
     delete transports[sessionId];
+
+    console.log("Terminated MCP session with sessionId: ", sessionId);
 });
 
 

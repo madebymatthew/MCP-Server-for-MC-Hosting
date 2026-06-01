@@ -24,6 +24,7 @@ const requireAuth = (req: ExpressRequest, res: ExpressResponse, next: NextFuncti
             .set("WWW-Authenticate",`Bearer resource_metadata="${OAUTH_AUDIENCE}/.well-known/oauth-protected-resource"`)
             .json({error: "Unauthorized"});
         } else {
+            console.log("Authentication successful for user: ", req.auth?.payload?.sub);
             next();
         }
     });
@@ -33,6 +34,7 @@ const requireAuth = (req: ExpressRequest, res: ExpressResponse, next: NextFuncti
  * Handles responding to calls made at /.well-known/oauth-protected-resource for auth server discovery
  */
 const authDiscoveryHandler = (req: ExpressRequest, res: ExpressResponse) => {
+    console.log("Received request at auth discovery endpoint, responding with auth metadata");
     res.json({
         resource: OAUTH_AUDIENCE,
         authorization_servers: [OAUTH_ISSUER],
