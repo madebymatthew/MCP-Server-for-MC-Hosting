@@ -35,15 +35,16 @@ const requireAuth = (req: ExpressRequest, res: ExpressResponse, next: NextFuncti
 const authDiscoveryHandler = (req: ExpressRequest, res: ExpressResponse) => {
     res.json({
         resource: OAUTH_AUDIENCE,
-        authorization_servers: [OAUTH_ISSUER]
+        authorization_servers: [OAUTH_ISSUER],
+        registration_endpoint: `${OAUTH_ISSUER}/oidc/register`
     })
 }
 
 /**
  * @returns true/false for whether this user is an admin
  */
-const checkAdminRole = (req: ExpressRequest): boolean => {
-    return ((req.auth?.payload?.["https://mcp-server/roles"] as string[] ?? []).includes("admin"));
+const checkAdminPermissions = (req: ExpressRequest): boolean => {
+    return ((req.auth?.payload?.permissions as string[] ?? []).includes("admin"));
 }
 
-export { requireAuth, authDiscoveryHandler, checkAdminRole }
+export { requireAuth, authDiscoveryHandler, checkAdminPermissions }

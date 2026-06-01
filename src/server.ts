@@ -8,7 +8,7 @@ import type { Request as ExpressRequest, Response as ExpressResponse } from "exp
 import type { IncomingMessage } from "http";
 
 import { getRequiredFromEnv } from "./helper-functions.js";
-import { requireAuth, authDiscoveryHandler, checkAdminRole } from "./auth.js"
+import { requireAuth, authDiscoveryHandler, checkAdminPermissions } from "./auth.js"
 import { registerCapabilities } from "./tools.js";
 
 // ============================ CREATE CONSTANTS ============================
@@ -47,7 +47,7 @@ app.post("/mcp", requireAuth, async (req: ExpressRequest, res: ExpressResponse) 
         const server = new McpServer({ name: "Minecraft Server Hosting", version: "1.0.0"});
         
         // Add the capabilities this server should handle (depends on admin or regular user)
-        const isAdmin: boolean = checkAdminRole(req);
+        const isAdmin: boolean = checkAdminPermissions(req);
         registerCapabilities(server, isAdmin);
 
         // Create new transport for this connection
