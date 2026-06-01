@@ -33,7 +33,7 @@ const requireAuth = (req: ExpressRequest, res: ExpressResponse, next: NextFuncti
 /**
  * Handles responding to calls made at /.well-known/oauth-protected-resource for auth server discovery
  */
-const authDiscoveryHandler = (req: ExpressRequest, res: ExpressResponse) => {
+const authDiscoveryHandler = (_req: ExpressRequest, res: ExpressResponse) => {
     console.log("Received request at auth discovery endpoint, responding with auth metadata");
     res.json({
         resource: OAUTH_AUDIENCE,

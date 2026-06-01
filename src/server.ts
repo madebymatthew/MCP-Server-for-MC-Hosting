@@ -110,7 +110,7 @@ app.get("/.well-known/oauth-protected-resource", authDiscoveryHandler);
 // REQUESTS FOR SERVER INITIATED MESSAGES
 // MCP compliance means I need to handle GET requests to the same endpoint
 // even if its just to return a 405 to tell the client Im not supporting server initiated messages
-app.get("/mcp", requireAuth, (req: ExpressRequest, res: ExpressResponse) => {
+app.get("/mcp", requireAuth, (_req: ExpressRequest, res: ExpressResponse) => {
     res.status(405).json({ error: "Method Not Allowed" });
 });
 
