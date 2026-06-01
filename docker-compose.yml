@@ -10,5 +10,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=${PORT:?PORT is not set in .env}
+      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:?OAUTH_AUDIENCE is not set in .env}
+      - OAUTH_ISSUER=${OAUTH_ISSUER:?OAUTH_ISSUER is not set in .env}
     image: ghcr.io/madebymatthew/mcp-server-for-mc-hosting:latest
     restart: unless-stopped
