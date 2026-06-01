@@ -30,7 +30,7 @@ const requireAuth = (req: ExpressRequest, res: ExpressResponse, next: NextFuncti
 }
 
 /**
- * Handles responding to calls made at /.well-known/oauth-authorization-server for auth server discovery
+ * Handles responding to calls made at /.well-known/oauth-protected-resource for auth server discovery
  */
 const authDiscoveryHandler = (req: ExpressRequest, res: ExpressResponse) => {
     res.json({
