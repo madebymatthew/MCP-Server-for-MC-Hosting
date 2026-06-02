@@ -8,7 +8,7 @@ import type { Request as ExpressRequest, Response as ExpressResponse } from "exp
 import type { IncomingMessage } from "http";
 
 import { getRequiredFromEnv } from "./helper-functions.js";
-import { requireAuth, authDiscoveryHandler, checkAdminPermissions } from "./auth.js"
+import { requireAuth, authDiscoveryHandler, checkAdminPermissions, checkOrigin } from "./auth.js"
 import { registerCapabilities } from "./tools.js";
 
 // ============================ CREATE CONSTANTS ============================
@@ -30,17 +30,7 @@ const transports: Record<string, StreamableHTTPServerTransport> = {};
  * This function validates the origin header of incoming requests.
  * The MCP spec requires this to prevent DNS rebinding attacks
  */
-app.use((req: ExpressRequest, res: ExpressResponse, next) => {
-    
-    const origin = req.headers.origin;
-
-    if (origin !== undefined && !ALLOWED_ORIGIN.includes(origin)) {
-        res.status(403).json({ error: "Forbidden: Invalid origin" });
-        return;
-    }
-    next();
-
-});
+app.use(checkOrigin);
 
 /**
  * This middleware function checks for valid oAuth2 tokens on incoming requests.
@@ -124,7 +114,7 @@ app.delete("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
     delete transports[sessionId];
 
     console.log("Terminated MCP session with sessionId: ", sessionId);
-    
+
 });
 
 

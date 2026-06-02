@@ -5,6 +5,7 @@ import { getRequiredFromEnv } from "./helper-functions.js";
 // Constants from ENV file
 const OAUTH_ISSUER = getRequiredFromEnv("OAUTH_ISSUER");
 const OAUTH_AUDIENCE = getRequiredFromEnv("OAUTH_AUDIENCE");
+const ALLOWED_ORIGINS = getRequiredFromEnv("ALLOWED_ORIGINS").split(",");
 
 /**
  * Define oauth token validator to use in middleware function
@@ -31,6 +32,21 @@ const requireAuth = (req: ExpressRequest, res: ExpressResponse, next: NextFuncti
 }
 
 /**
+ * Middleware function to check the origin header
+ */
+const checkOrigin = (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+    
+    const origin = req.headers.origin;
+
+    if (origin !== undefined && !ALLOWED_ORIGINS.includes(origin)) {
+        res.status(403).json({ error: "Forbidden: Invalid origin" });
+        return;
+    }
+    next();
+
+}
+
+/**
  * Handles responding to calls made at /.well-known/oauth-protected-resource for auth server discovery
  */
 const authDiscoveryHandler = (_req: ExpressRequest, res: ExpressResponse) => {
@@ -49,4 +65,4 @@ const checkAdminPermissions = (req: ExpressRequest): boolean => {
     return ((req.auth?.payload?.permissions as string[] ?? []).includes("admin"));
 }
 
-export { requireAuth, authDiscoveryHandler, checkAdminPermissions }
+export { requireAuth, authDiscoveryHandler, checkAdminPermissions, checkOrigin }
