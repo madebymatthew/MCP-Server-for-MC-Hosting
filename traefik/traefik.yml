@@ -1,0 +1,31 @@
+api:
+  dashboard: false
+log:
+  level: INFO
+entryPoints:
+  web:
+    address: ":80"
+    # Redirect all HTTP traffic to HTTPS
+    http:
+      redirections:
+        entryPoint:
+          to: web-secure
+          scheme: https
+          permanent: true
+  web-secure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "tcp://socket-proxy:2375"
+    exposedByDefault: false
+    network: mcp-internal
+  
+# Lets Encrypt certificate resolver. Uses GET on port 80 to verify domain ownership
+certificateResolvers:
+  letsencrypt:
+    acme:
+      email: matthewherrera48@gmail.com
+      storage: /acme.json
+      httpChallenge:
+        entryPoint: web

@@ -1,4 +1,65 @@
+networks:
+  # External network - only Traefik and socket-proxy
+  traefik-public:
+    name: traefik-public
+
+  # Internal network - all containers
+  mcp-internal:
+    name: mcp-internal
+
+  # Isolated network - only Traefik and socket-proxy
+  # Keeping socket-proxy isolated means nothing else can talk to docker
+  socket-proxy-net:
+    name: socket-proxy-net
+    internal: true # No external internet access
+
 services:
+  # ==========================================================================
+  # Socket proxy - restricts Docker API Access.
+  # Mounting docker socket directly to Traefik leaves host machine vulnearable
+  # So use socket proxy instead.
+  #
+  # Traefik only needs read access to containers,
+  # so allow only GET on containers
+  # ==========================================================================
+  socket-proxy:
+    image: wollomatic/socket-proxy:1
+    restart: unless-stopped
+    command:
+      - "-allowGET=/v1\\..{1,2}/(version|containers/.*|events.*)"
+      - "-allowHEAD=/_ping"
+      - "-listenip=0.0.0.0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - socket-proxy-net
+    expose:
+      - "2375" # ONLY expose internally to Traefik
+
+  # ==========================================================================
+  # Traefik - reverse proxy to automatically enable HTTPS
+  # ==========================================================================
+  traefik:
+    image: traefik:v3
+    restart: unless-stopped
+    depends_on:
+      - socket-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Static configuration file for Traefik
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      # Certificate storage for Let's Encrypt. Must be writable by Traefik
+      - ./acme.json:/acme.json
+    networks:
+      - traefik-public
+      - socket-proxy-net
+      - mcp-internal
+
+  # ==========================================================================
+  # MCP Server - Main application server
+  # ==========================================================================
   mcp-server:
     build:
       context: .
@@ -9,3 +70,28 @@ services:
       - .env
     image: ghcr.io/madebymatthew/mcp-server-for-mc-hosting:latest
     restart: unless-stopped
+
+    expose:
+      - "${PORT}" # Expose internally to Traefik
+    networks:
+      - mcp-internal
+    labels:
+      - "traefik.enable=true"
+
+      # Route HTTPS traffic for cloud.matthewherrera.dev to this container
+      - "traefik.http.routers.mcp.rule=Host(`cloud.matthewherrera.dev`)"
+      - "traefik.http.routers.mcp.entrypoints=web-secure"
+      - "traefik.http.routers.mcp.tls.certresolver=letsencrypt"
+
+      # Tell traefik which port to forward traffic to inside the container
+      - "traefik.http.services.mcp.loadbalancer.server.port=${PORT}"
+
+      # Flush immediately for SSE streaming, negative value means flush on every write
+      - "traefik.http.services.mcp.loadbalancer.responseforwarding.flushinterval=-1"
+
+      # Security headers middleware
+      - "traefik.http.middlewares.mcp-headers.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.mcp-headers.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.mcp-headers.headers.stsPreload=true"
+      - "traefik.http.middlewares.mcp-headers.headers.forceSTSHeader=true"
+      - "traefik.http.routers.mcp.middlewares=mcp-headers"
