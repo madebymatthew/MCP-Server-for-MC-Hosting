@@ -15,7 +15,6 @@ import { registerCapabilities } from "./tools.js";
 
 // All of the values needed from the .env file
 const PORT = getRequiredFromEnv("PORT");
-const ALLOWED_ORIGIN = getRequiredFromEnv("ALLOWED_ORIGIN");
 
 // Express to handle network
 const app = express();
