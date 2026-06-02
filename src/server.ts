@@ -15,6 +15,7 @@ import { registerCapabilities } from "./tools.js";
 
 // All of the values needed from the .env file
 const PORT = getRequiredFromEnv("PORT");
+const ALLOWED_ORIGIN = getRequiredFromEnv("ALLOWED_ORIGIN");
 
 // Express to handle network
 const app = express();
@@ -23,10 +24,34 @@ app.use(express.json());
 // A map of String, StreamableHTTPServerTransport objects to store each client connection
 const transports: Record<string, StreamableHTTPServerTransport> = {};
 
+
+// ======================= DEFINE MIDDLEWARE FUNCTIONS =======================
+/**
+ * This function validates the origin header of incoming requests.
+ * The MCP spec requires this to prevent DNS rebinding attacks
+ */
+app.use((req: ExpressRequest, res: ExpressResponse, next) => {
+    
+    const origin = req.headers.origin;
+
+    if (origin !== undefined && !ALLOWED_ORIGIN.includes(origin)) {
+        res.status(403).json({ error: "Forbidden: Invalid origin" });
+        return;
+    }
+    next();
+
+});
+
+/**
+ * This middleware function checks for valid oAuth2 tokens on incoming requests.
+ * Only needed on /mcp endpoints
+ */
+app.use("/mcp", requireAuth);
+
 // ========================== DEFINE EXPRESS ROUTES ==========================
 
 //======== TYPICAL POST CALL DURING OPERATION ========
-app.post("/mcp", requireAuth, async (req: ExpressRequest, res: ExpressResponse) => {
+app.post("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
 
     // MCP says this header should be a string, but its possible that a misbehaving client sends an
     // array of strings instead. Since Im going to be the only one using this, Im going to skip an input validation
@@ -78,13 +103,11 @@ app.post("/mcp", requireAuth, async (req: ExpressRequest, res: ExpressResponse) 
         return;
     }
 
-    // Transport is now initialized, it'll forward requests to the mcp server
-    
 });
 
 
 // GRACEFUL CONNECTION TERMINATION REQUESTS
-app.delete("/mcp", requireAuth, async (req: ExpressRequest, res: ExpressResponse) => {
+app.delete("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
     
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     
@@ -101,6 +124,7 @@ app.delete("/mcp", requireAuth, async (req: ExpressRequest, res: ExpressResponse
     delete transports[sessionId];
 
     console.log("Terminated MCP session with sessionId: ", sessionId);
+    
 });
 
 
@@ -110,7 +134,7 @@ app.get("/.well-known/oauth-protected-resource", authDiscoveryHandler);
 // REQUESTS FOR SERVER INITIATED MESSAGES
 // MCP compliance means I need to handle GET requests to the same endpoint
 // even if its just to return a 405 to tell the client Im not supporting server initiated messages
-app.get("/mcp", requireAuth, (_req: ExpressRequest, res: ExpressResponse) => {
+app.get("/mcp", (_req: ExpressRequest, res: ExpressResponse) => {
     res.status(405).json({ error: "Method Not Allowed" });
 });
 
