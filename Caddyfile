@@ -5,15 +5,17 @@ cloud.matthewherrera.dev {
     # Docker will resolve this address
     # =======================================================================
     
-    reverse_proxy mcp-server:{$PORT}
+    reverse_proxy mcp-server:{$PORT} {
 
+        # =============================================
+        # This tells caddy to send messages right away
+        # instead of buffering. This is needed for SSE
+        # messages to be sent live, instead of waiting
+        # =============================================
 
-    # =======================================================================
-    # This tells caddy to send messages right away instead of buffering
-    # Needed for SSE messages to be sent live, instead of waiting
-    # =======================================================================
-    
-    flush_interval -1
+        flush_interval -1
+
+    }
 
 
     # =======================================================================
@@ -34,7 +36,7 @@ cloud.matthewherrera.dev {
     # This section adds logging we can view with docker compose logs
     # =======================================================================
 
-    logs {
+    log {
         output stdout
     }
 }
