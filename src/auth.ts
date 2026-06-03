@@ -22,7 +22,7 @@ const requireAuth = (req: ExpressRequest, res: ExpressResponse, next: NextFuncti
     validateToken(req, res, (err) => {
         if (err) {
             res.status(401)
-            .set("WWW-Authenticate",`Bearer resource_metadata="${OAUTH_AUDIENCE}.well-known/oauth-protected-resource"`)
+            .set("WWW-Authenticate",`Bearer resource_metadata="${OAUTH_AUDIENCE}/.well-known/oauth-protected-resource"`)
             .json({error: "Unauthorized"});
         } else {
             console.log("Authentication successful for user: ", req.auth?.payload?.sub);
