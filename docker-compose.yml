@@ -28,7 +28,7 @@ services:
       - caddy-public
       - mcp-internal
     depends_on:
-      - mcp-server
+      - mcp-server # Run mcp-server before caddy
 
   # Our mcp-server container, which holds all our application code.
   # This includes the mcp server and also the MC process it starts
