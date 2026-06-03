@@ -1,0 +1,42 @@
+cloud.matthewherrera.dev {
+
+    # =======================================================================
+    # mcp-server is the docker-compose service name.
+    # Docker will resolve this address
+    # =======================================================================
+    
+    reverse_proxy mcp-server:{$PORT} {
+
+        # =============================================
+        # This tells caddy to send messages right away
+        # instead of buffering. This is needed for SSE
+        # messages to be sent live, instead of waiting
+        # =============================================
+
+        flush_interval -1
+
+    }
+
+
+    # =======================================================================
+    # This section adds security headers to all RESPONSES forwarded by caddy
+    # Strict-Transport-Security : Tells browsers to only use https
+    # X-Content-Type-Options : Prevents MIME sniffing attacks (probably not
+    # needed since we aren't serving user uploaded files, but good practice)
+    # =======================================================================
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        -Server
+    }
+
+
+    # =======================================================================
+    # This section adds logging we can view with docker compose logs
+    # =======================================================================
+
+    log {
+        output stdout
+    }
+}

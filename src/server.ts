@@ -2,18 +2,44 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 
-import { z } from "zod";
-
 import express from "express";
 import type { Request as ExpressRequest, Response as ExpressResponse } from "express";
 
+import type { IncomingMessage } from "http";
 
+import { getRequiredFromEnv } from "./helper-functions.js";
+import { requireAuth, authDiscoveryHandler, checkAdminPermissions, checkOrigin } from "./auth.js"
+import { registerCapabilities } from "./tools.js";
+
+// ============================ CREATE CONSTANTS ============================
+
+// All of the values needed from the .env file
+const PORT = getRequiredFromEnv("PORT");
+
+// Express to handle network
 const app = express();
 app.use(express.json());
 
 // A map of String, StreamableHTTPServerTransport objects to store each client connection
 const transports: Record<string, StreamableHTTPServerTransport> = {};
 
+
+// ======================= DEFINE MIDDLEWARE FUNCTIONS =======================
+/**
+ * This function validates the origin header of incoming requests.
+ * The MCP spec requires this to prevent DNS rebinding attacks
+ */
+app.use(checkOrigin);
+
+/**
+ * This middleware function checks for valid oAuth2 tokens on incoming requests.
+ * Only needed on /mcp endpoints
+ */
+app.use("/mcp", requireAuth);
+
+// ========================== DEFINE EXPRESS ROUTES ==========================
+
+//======== TYPICAL POST CALL DURING OPERATION ========
 app.post("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
 
     // MCP says this header should be a string, but its possible that a misbehaving client sends an
@@ -22,28 +48,28 @@ app.post("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
     const sessionId = req.headers["mcp-session-id"] as string | undefined; 
     let transport: StreamableHTTPServerTransport;
 
+    console.log("Received request at /mcp endpoint with sessionId: ", sessionId);
+    console.log("Current transports map: ", Object.keys(transports));
+
     // Check if its an existing session or a new session
     if (sessionId && transports[sessionId]) {
         // If its an existing session, then use the transport we already have
         transport = transports[sessionId];
-        await transport.handleRequest(req, res, req.body);
+        await transport.handleRequest(req as unknown as IncomingMessage, res, req.body);
     }
     // Else if its a new initialize session
     else if (!sessionId && isInitializeRequest(req.body)) {
 
         // Create new mcp server object to handle session state
         const server = new McpServer({ name: "Minecraft Server Hosting", version: "1.0.0"});
+
+        console.log("Initializing new MCP session with new McpServer instance, now adding capabilities...");
         
-        // Adding dummy tool for testing
-        server.registerTool( "get-secret",
-            {
-                description: "Gets a secret minecraft value",
-                inputSchema: z.object({})
-            },
-            async () => ({
-                content: [{type: "text", text: "xyzzy"}]
-            })
-        );
+        // Add the capabilities this server should handle (depends on admin or regular user)
+        const isAdmin: boolean = checkAdminPermissions(req);
+        registerCapabilities(server, isAdmin);
+
+        console.log("Finished registering capabilities, user is admin: ", isAdmin);
 
         // Create new transport for this connection
         transport = new StreamableHTTPServerTransport({
@@ -52,7 +78,7 @@ app.post("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
 
         // Link to the server and handle request
         await server.connect(transport);
-        await transport.handleRequest(req, res, req.body);
+        await transport.handleRequest(req as unknown as IncomingMessage, res, req.body);
 
         // ONLY AFTER CONNECTING AND HANDLING REQUEST DO WE STORE TRANSPORT
         // Otherwise sessionId will be undefined
@@ -60,19 +86,22 @@ app.post("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
     }
     // Else theres been a problem with this request
     else {
-        res.status(400).json({ error: "Invalid MCP request: missing or invalid session ID, or missing initialize request body" });
+        res.status(400).json(
+            { error: "Invalid MCP request: missing or invalid session ID,\
+                or missing initialize request body" });
         return;
     }
 
-    // Transport is now initialized, it'll forward requests to the mcp server
-    
 });
 
-// Now set up graceful connection termination
+
+// GRACEFUL CONNECTION TERMINATION REQUESTS
 app.delete("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
     
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
     
+    console.log("Received request to terminate MCP session with sessionId: ", sessionId);
+
     // check if the session ID was provided and exists in transports
     if (!sessionId || !transports[sessionId]) {
         res.status(400).json({ error: "Invalid session ID" });
@@ -80,21 +109,24 @@ app.delete("/mcp", async (req: ExpressRequest, res: ExpressResponse) => {
     }
 
     // Remove the transport from the map
-    await transports[sessionId].handleRequest(req, res, req.body);
+    await transports[sessionId].handleRequest(req as unknown as IncomingMessage, res, req.body);
     delete transports[sessionId];
+
+    console.log("Terminated MCP session with sessionId: ", sessionId);
+
 });
 
+
+// REQUESTS FOR AUTHENTICATION SERVER DISCOVERY
+app.get("/.well-known/oauth-protected-resource", authDiscoveryHandler);
+
+// REQUESTS FOR SERVER INITIATED MESSAGES
 // MCP compliance means I need to handle GET requests to the same endpoint
 // even if its just to return a 405 to tell the client Im not supporting server initiated messages
-app.get("/mcp", (req: ExpressRequest, res: ExpressResponse) => {
+app.get("/mcp", (_req: ExpressRequest, res: ExpressResponse) => {
     res.status(405).json({ error: "Method Not Allowed" });
 });
 
-// Set the port
-if (!process.env.PORT) {
-    throw new Error("PORT environment variable not set in .env file");
-}
-const PORT = process.env.PORT;
 
 // Start the server
 app.listen(PORT, () => {

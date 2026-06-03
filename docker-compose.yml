@@ -1,14 +1,50 @@
+networks:
+  caddy-public: # Only thing exposed to the internet is Caddy
+  mcp-internal: # Mcp server will be internal only, we will reach it via caddy
+
+volumes:
+  caddy_data: # Certificate storage
+  caddy_config: # Caddy runtime config
+
 services:
+  # Our caddy container, which will be the only thing exposed to the internet.
+  # It will handle https and forwarding traffic to the mcp server container
+  caddy:
+    image: caddy:2-alpine # Alpine is a lightweight image of caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # Caddy supports HTTP/3 out of box, enabled by this port
+    volumes:
+      # These are things we need persistent across restarts. They are items
+      # which are not container dependent and need to live outside of them
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro # Caddyfile
+      - caddy_data:/data # Certificate storage
+      - caddy_config:/config # Caddy runtime config
+    env_file:
+      - .env
+    networks:
+      - caddy-public
+      - mcp-internal
+    depends_on:
+      - mcp-server # Run mcp-server before caddy
+
+  # Our mcp-server container, which holds all our application code.
+  # This includes the mcp server and also the MC process it starts
   mcp-server:
+    image: ghcr.io/madebymatthew/mcp-server-for-mc-hosting:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "${PORT}"
+    networks:
+      - mcp-internal
     build:
       context: .
       platforms:
         - linux/amd64
         - linux/arm64
-    ports:
-      - "${PORT}:${PORT}"
-    environment:
-      - NODE_ENV=production
-      - PORT=${PORT:?PORT is not set in .env}
-    image: ghcr.io/madebymatthew/mcp-server-for-mc-hosting:latest
-    restart: unless-stopped
+
+
