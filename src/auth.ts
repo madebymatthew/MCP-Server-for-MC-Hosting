@@ -4,14 +4,17 @@ import { getRequiredFromEnv } from "./helper-functions.js";
 
 // Constants from ENV file
 const OAUTH_ISSUER = getRequiredFromEnv("OAUTH_ISSUER");
-const OAUTH_AUDIENCE = getRequiredFromEnv("OAUTH_AUDIENCE");
+// A bug in claude desktop was adding a trailing slash to the 'resource' returned from the auth discovery endpoint,
+// Github says the issue has been open for a month. So until they fix this, I have to add 2 audiences to account for
+// both my normal audience, and one with a trailing slash appended.
+const OAUTH_AUDIENCES = getRequiredFromEnv("OAUTH_AUDIENCES").split(",");
 const ALLOWED_ORIGINS = getRequiredFromEnv("ALLOWED_ORIGINS").split(",");
 
 /**
  * Define oauth token validator to use in middleware function
  */
 const validateToken = auth({
-    audience: OAUTH_AUDIENCE,
+    audience: OAUTH_AUDIENCES,
     issuerBaseURL: OAUTH_ISSUER
 });
 
@@ -22,7 +25,7 @@ const requireAuth = (req: ExpressRequest, res: ExpressResponse, next: NextFuncti
     validateToken(req, res, (err) => {
         if (err) {
             res.status(401)
-            .set("WWW-Authenticate",`Bearer resource_metadata="${OAUTH_AUDIENCE}/.well-known/oauth-protected-resource"`)
+            .set("WWW-Authenticate",`Bearer resource_metadata="${OAUTH_AUDIENCES[0]}/.well-known/oauth-protected-resource"`)
             .json({error: "Unauthorized"});
         } else {
             console.log("Authentication successful for user: ", req.auth?.payload?.sub);
@@ -52,7 +55,7 @@ const checkOrigin = (req: ExpressRequest, res: ExpressResponse, next: NextFuncti
 const authDiscoveryHandler = (_req: ExpressRequest, res: ExpressResponse) => {
     console.log("Received request at auth discovery endpoint, responding with auth metadata");
     res.json({
-        resource: OAUTH_AUDIENCE,
+        resource: OAUTH_AUDIENCES[0],
         authorization_servers: [OAUTH_ISSUER],
         registration_endpoint: `${OAUTH_ISSUER}/oidc/register`
     })
